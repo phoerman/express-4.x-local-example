@@ -1,8 +1,33 @@
 var express = require('express');
 var passport = require('passport');
 var Strategy = require('passport-local').Strategy;
-var db = require('./db');
+var multer = require('multer');
+var crypto = require('crypto');
+var path = require('path');
+var fs = require('fs');
 
+var storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function(req, file, cb) {
+    crypto.pseudoRandomBytes(16, function(err, raw) {
+      cb(null, raw.toString('hex') + path.extname(file.originalname));
+    });
+  }
+});
+var db = require('./db');
+var encryptor = require('file-encryptor');
+
+var key = 'Some encrypted key';
+var upload = multer({
+  storage: storage,
+  onFileUploadComplete: function (file) {
+    encryptor.encryptFile(file, 'encryptedFile.dat', key, function(err){
+      fs.unlink(file);
+    });
+  }
+});
 
 // Configure the local strategy for use by Passport.
 //
@@ -88,6 +113,11 @@ app.get('/profile',
   require('connect-ensure-login').ensureLoggedIn(),
   function(req, res){
     res.render('profile', { user: req.user });
+  });
+
+app.post('/upload', upload.single('image_uploads'),
+  function (req, res) {
+    res.end();
   });
 
 app.listen(3000);
